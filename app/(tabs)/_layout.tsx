@@ -1,33 +1,66 @@
-import { Stack, Tabs } from 'expo-router';
-import { defaultRouteInfo } from 'expo-router/build/global-state/routeInfo';
-import React from 'react';
+import { Tabs } from 'expo-router';
+import { useAuth } from '../../contexts/AuthContext';
+import { useEffect } from 'react';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import "../globals.css"
 
-const _Layout = () => {
-    return (
-        <Tabs>
-            <Tabs.Screen 
-                name='browse'
-                options={{
-                    title: "Browse",
-                    headerShown: true
-                }}
-            />
-            <Tabs.Screen 
-                name='index'
-                options={{
-                    title: "Home",
-                    headerShown: false
-                }}
-            />
-            <Tabs.Screen 
-                name='cart'
-                options={{
-                    title: "Cart",
-                    headerShown: true
-                }}
-            /> 
-        </Tabs>
-    )
+
+export default function TabLayout() {
+  const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace('/(auth)/login');
+    }
+  }, [user, isLoading]);
+
+  if (isLoading) {
+    return null; // Show loading screen
+  }
+
+  if (!user) {
+    return null; // Will redirect to login
+  }
+
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: '#007AFF',
+        tabBarInactiveTintColor: '#6B7280',
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E5E7EB',
+        },
+        headerShown: false,
+      }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="scan"
+        options={{
+          title: 'Scan',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="scan" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
+  );
 }
-
-export default _Layout
