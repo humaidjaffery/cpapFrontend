@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Alert, Dimensions } from 'react-native';
-import { Camera, CameraType, CameraView } from 'expo-camera';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import {Camera, useCameraPermission, CameraPermissionStatus, useCameraDevice, useFrameProcessor} from 'react-native-vision-camera'
+import { BottomTabBarHeightCallbackContext } from '@react-navigation/bottom-tabs';
 
 const { width, height } = Dimensions.get('window');
 
@@ -15,12 +16,11 @@ interface ScanData {
 }
 
 export default function ActiveScan() {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [hasPermission, setHasPermission] = React.useState<CameraPermissionStatus>("not-determined")
   const [isScanning, setIsScanning] = useState(false);
   const [currentAngle, setCurrentAngle] = useState<'front' | 'left' | 'right' | 'top' | 'bottom'>('front');
   const [scanProgress, setScanProgress] = useState(0);
   const [scanData, setScanData] = useState<ScanData>({} as ScanData);
-  const cameraRef = useRef<null | typeof Camera>(null);
 
   const angles = [
     { key: 'front', name: 'Front', icon: 'person', instruction: 'Face the camera directly' },
@@ -34,10 +34,20 @@ export default function ActiveScan() {
     checkPermissions();
   }, []);
 
+  const device = useCameraDevice("front")
+  console.log(device)
+  if(!device) return <View> <Text> You must have an Iphone Camera</Text> </View>
+
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet'
+    // console.log('Frame dimensions:', frame.width, 'x', frame.height);
+    // console.log(frame.pixelFormat)
+  }, [])
+
   const checkPermissions = async () => {
-    const { status } = await Camera.requestCameraPermissionsAsync();
-    setHasPermission(status === 'granted');
-  };
+    const persmission = await Camera.requestCameraPermission()
+    setHasPermission(persmission);
+  }
 
   const startScan = async () => {
     setIsScanning(true);
@@ -84,7 +94,7 @@ export default function ActiveScan() {
     );
   };
 
-  if (hasPermission === null) {
+  if (hasPermission === 'not-determined') {
     return (
       <View className="flex-1 bg-background justify-center items-center">
         <Text className="text-secondary">Requesting camera permission...</Text>
@@ -92,7 +102,7 @@ export default function ActiveScan() {
     );
   }
 
-  if (hasPermission === false) {
+  if (hasPermission !== "granted") {
     return (
       <View className="flex-1 bg-background justify-center items-center p-6">
         <Ionicons name="alert" size={64} color="#EF4444" />
@@ -113,102 +123,12 @@ export default function ActiveScan() {
   const currentAngleData = angles.find(a => a.key === currentAngle);
 
   return (
-    <View className="flex-1 bg-black">
-      {/* Camera View */}
-      <CameraView
-        ref={cameraRef as unknown as React.RefObject<CameraView>}
-        className="flex-1"
-        facing="front"
-        ratio="4:3"
-      >
-        {/* Overlay */}
-        <View className="flex-1">
-          {/* Header */}
-          <View className="flex-row justify-between items-center p-6 pt-12">
-            <TouchableOpacity
-              onPress={handleCancel}
-              className="w-10 h-10 bg-black/50 rounded-full items-center justify-center"
-            >
-              <Ionicons name="close" size={24} color="white" />
-            </TouchableOpacity>
-            
-            <View className="bg-black/50 px-4 py-2 rounded-full">
-              <Text className="text-white font-semibold">
-                {Math.round(scanProgress)}% Complete
-              </Text>
-            </View>
-          </View>
-
-          {/* Center Content */}
-          <View className="flex-1 justify-center items-center">
-            {!isScanning ? (
-              <View className="items-center space-y-6">
-                <View className="w-32 h-32 border-4 border-white rounded-full items-center justify-center">
-                  <Ionicons name="camera" size={48} color="white" />
-                </View>
-                <Text className="text-white text-2xl font-bold text-center">
-                  Ready to Scan
-                </Text>
-                <Text className="text-white/80 text-center px-8">
-                  We'll capture your face from multiple angles to create a perfect 3D model
-                </Text>
-                <TouchableOpacity
-                  className="bg-primary px-8 py-4 rounded-lg"
-                  onPress={startScan}
-                >
-                  <Text className="text-white font-semibold text-lg">Start Scan</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View className="items-center space-y-6">
-                {/* Scanning Animation */}
-                <View className="w-32 h-32 border-4 border-primary rounded-full items-center justify-center">
-                  <View className="w-24 h-24 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                </View>
-                
-                <Text className="text-white text-2xl font-bold text-center">
-                  Scanning {currentAngleData?.name}
-                </Text>
-                
-                <Text className="text-white/80 text-center px-8">
-                  {currentAngleData?.instruction}
-                </Text>
-
-                {/* Progress Bar */}
-                <View className="w-64 h-2 bg-white/20 rounded-full">
-                  <View 
-                    className="h-2 bg-primary rounded-full"
-                    style={{ width: `${scanProgress}%` }}
-                  />
-                </View>
-
-                {/* Current Angle Indicator */}
-                <View className="flex-row space-x-2">
-                  {angles.map((angle, index) => (
-                    <View
-                      key={angle.key}
-                      className={`w-3 h-3 rounded-full ${
-                        currentAngle === angle.key ? 'bg-primary' : 'bg-white/30'
-                      }`}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* Bottom Instructions */}
-          {isScanning && (
-            <View className="p-6">
-              <View className="bg-black/50 p-4 rounded-lg">
-                <Text className="text-white text-center font-semibold">
-                  Keep your head still and follow the prompts
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
-      </CameraView>
+    <View className='h-full w-full'>
+      <Camera style={{flex: 1}} device={device} frameProcessor={frameProcessor} isActive /> 
+      <View className='absolute top-0 left-0 right-0 bottom-0 w-full h-full flex justify-center items-center'>
+        <Text className='text-3xl text-center '> Scan </Text>
+      </View>
     </View>
   );
 } 
+

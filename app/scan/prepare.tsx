@@ -60,7 +60,7 @@ export default function ScanPrepare() {
           {/* Header */}
           <View className="space-y-4 items-center">
             <View className="w-20 h-20 bg-primary rounded-full items-center justify-center">
-              <Ionicons name="camera" size={40} color="white" />
+              <Ionicons name="camera" size={100} color="white" />
             </View>
             <Text className="text-3xl font-bold text-primary text-center">
               Prepare to Scan

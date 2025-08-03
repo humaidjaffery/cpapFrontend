@@ -9,7 +9,8 @@ export default function Home() {
   const { user, signOut } = useAuth();
 
   const handleStartScan = () => {
-    router.push('/survey/welcome');
+    // router.push('/survey/welcome');
+    router.push('/scan/prepare')
   };
 
   const handleSignOut = () => {

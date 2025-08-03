@@ -32,42 +32,42 @@ export default function MedicalSurvey() {
       type: 'select',
       options: ['Yes, I use one regularly', 'Yes, but not regularly', 'No, but I have a prescription', 'No, I don\'t have one yet']
     },
-    {
-      id: 'maskType',
-      question: 'What type of mask do you currently use or prefer?',
-      type: 'select',
-      options: ['Nasal mask', 'Full face mask', 'Nasal pillows', 'I don\'t know', 'I don\'t have a preference']
-    },
-    {
-      id: 'sleepPosition',
-      question: 'What position do you sleep in most often?',
-      type: 'select',
-      options: ['Back (supine)', 'Side (left)', 'Side (right)', 'Stomach (prone)', 'I move around a lot']
-    },
-    {
-      id: 'facialSensitivity',
-      question: 'Do you have any facial sensitivities or allergies?',
-      type: 'select',
-      options: ['No sensitivities', 'Sensitive to silicone', 'Sensitive to certain materials', 'I\'m not sure']
-    },
-    {
-      id: 'pressureLevel',
-      question: 'What is your CPAP pressure level? (if known)',
-      type: 'input',
-      placeholder: 'e.g., 8 cm H2O'
-    },
-    {
-      id: 'hoursPerNight',
-      question: 'How many hours do you typically use CPAP per night?',
-      type: 'select',
-      options: ['Less than 4 hours', '4-6 hours', '6-8 hours', 'More than 8 hours', 'I don\'t know yet']
-    },
-    {
-      id: 'additionalNotes',
-      question: 'Any additional information that might help with your mask fitting?',
-      type: 'input',
-      placeholder: 'Optional: Describe any specific issues or preferences...'
-    }
+    // {
+    //   id: 'maskType',
+    //   question: 'What type of mask do you currently use or prefer?',
+    //   type: 'select',
+    //   options: ['Nasal mask', 'Full face mask', 'Nasal pillows', 'I don\'t know', 'I don\'t have a preference']
+    // },
+    // {
+    //   id: 'sleepPosition',
+    //   question: 'What position do you sleep in most often?',
+    //   type: 'select',
+    //   options: ['Back (supine)', 'Side (left)', 'Side (right)', 'Stomach (prone)', 'I move around a lot']
+    // },
+    // {
+    //   id: 'facialSensitivity',
+    //   question: 'Do you have any facial sensitivities or allergies?',
+    //   type: 'select',
+    //   options: ['No sensitivities', 'Sensitive to silicone', 'Sensitive to certain materials', 'I\'m not sure']
+    // },
+    // {
+    //   id: 'pressureLevel',
+    //   question: 'What is your CPAP pressure level? (if known)',
+    //   type: 'input',
+    //   placeholder: 'e.g., 8 cm H2O'
+    // },
+    // {
+    //   id: 'hoursPerNight',
+    //   question: 'How many hours do you typically use CPAP per night?',
+    //   type: 'select',
+    //   options: ['Less than 4 hours', '4-6 hours', '6-8 hours', 'More than 8 hours', 'I don\'t know yet']
+    // },
+    // {
+    //   id: 'additionalNotes',
+    //   question: 'Any additional information that might help with your mask fitting?',
+    //   type: 'input',
+    //   placeholder: 'Optional: Describe any specific issues or preferences...'
+    // }
   ];
 
   const handleAnswer = (questionId: string, answer: string) => {
@@ -153,8 +153,8 @@ export default function MedicalSurvey() {
             ) : (
               <TextInput
                 className="w-full p-4 border border-border rounded-lg bg-card text-primary"
-                placeholder={currentQuestion.placeholder}
-                placeholderTextColor="#6B7280"
+                // placeholder={currentQuestion.placeholder}
+                // placeholderTextColor="#6B7280"
                 value={surveyData[currentQuestion.id as keyof SurveyData]}
                 onChangeText={(text) => handleAnswer(currentQuestion.id, text)}
                 multiline={currentQuestion.id === 'additionalNotes'}
