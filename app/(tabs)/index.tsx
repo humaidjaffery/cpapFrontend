@@ -10,7 +10,7 @@ export default function Home() {
 
   const handleStartScan = () => {
     // router.push('/survey/welcome');
-    router.push('/scan/prepare')
+    router.push('/scan/active')
   };
 
   const handleSignOut = () => {
