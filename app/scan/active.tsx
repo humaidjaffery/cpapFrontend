@@ -5,10 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import {Camera, useCameraPermission, CameraPermissionStatus, useCameraDevice, useFrameProcessor} from 'react-native-vision-camera'
 import { BottomTabBarHeightCallbackContext } from '@react-navigation/bottom-tabs';
 
-declare function trueDepthFrameProcessor(frame: any): any;
+import type { Frame } from 'react-native-vision-camera'
+
+declare global {
+  function __trueDepthFrameProcessor(frame: Frame): { width: number; height: number }
+}
 
 const { width, height } = Dimensions.get('window');
-         as
 interface ScanData {
   front: any;
   left: any;
@@ -37,14 +40,13 @@ export default function ActiveScan() {
   }, []);
 
   const device = useCameraDevice("front")
-  console.log(device)
+  // console.log(device)
   if(!device) return <View> <Text> You must have an Iphone Camera</Text> </View>
 
-
-  
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet'
-    const result = trueDepthFrameProcessor(frame)
+    console.log("IN frame procerssor")
+    const result = __trueDepthFrameProcessor(frame)
     console.log("RESULT: ")
     console.log(result)
   }, [])
