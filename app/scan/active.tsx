@@ -5,11 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import {Camera, useCameraPermission, CameraPermissionStatus, useCameraDevice, useFrameProcessor} from 'react-native-vision-camera'
 import { BottomTabBarHeightCallbackContext } from '@react-navigation/bottom-tabs';
 
+
 import type { Frame } from 'react-native-vision-camera'
 
-declare global {
-  function __trueDepthFrameProcessor(frame: Frame): { width: number; height: number }
-}
+// declare global {
+//   function trueDepthFrameProcessor(frame: Frame, options?: any): any;
+// }
 
 const { width, height } = Dimensions.get('window');
 interface ScanData {
@@ -26,6 +27,7 @@ export default function ActiveScan() {
   const [currentAngle, setCurrentAngle] = useState<'front' | 'left' | 'right' | 'top' | 'bottom'>('front');
   const [scanProgress, setScanProgress] = useState(0);
   const [scanData, setScanData] = useState<ScanData>({} as ScanData);
+  const [isPluginLoaded, setIsPluginLoaded] = useState(false);
 
   const angles = [
     { key: 'front', name: 'Front', icon: 'person', instruction: 'Face the camera directly' },
@@ -34,6 +36,31 @@ export default function ActiveScan() {
     { key: 'top', name: 'Above', icon: 'arrow-up', instruction: 'Tilt your head back slightly' },
     { key: 'bottom', name: 'Below', icon: 'arrow-down', instruction: 'Tilt your head forward slightly' }
   ];
+
+  useEffect(() => {
+    console.log('�� Checking trueDepthFrameProcessor availability...');
+    
+    // Check if it's available in the global scope
+    if (typeof (global as any).trueDepthFrameProcessor === 'function') {
+      console.log('✅ trueDepthFrameProcessor found in global scope');
+      setIsPluginLoaded(true);
+    } else {
+      console.log('❌ trueDepthFrameProcessor NOT found in global scope');
+      setIsPluginLoaded(false);
+      
+      // Try to wait for it to load
+      const checkInterval = setInterval(() => {
+        if (typeof (global as any).trueDepthFrameProcessor === 'function') {
+          console.log('✅ trueDepthFrameProcessor now available!');
+          setIsPluginLoaded(true);
+          clearInterval(checkInterval);
+        }
+      }, 1000);
+      
+      // Cleanup after 10 seconds
+      setTimeout(() => clearInterval(checkInterval), 10000);
+    }
+  }, []);
 
   useEffect(() => {
     checkPermissions();
@@ -45,11 +72,27 @@ export default function ActiveScan() {
 
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet'
-    console.log("IN frame procerssor")
-    const result = __trueDepthFrameProcessor(frame)
-    console.log("RESULT: ")
-    console.log(result)
-  }, [])
+    console.log("IN frame processor")
+    // Check for any frame processor related functions
+    const frameProcessorKeys = Object.keys(global)
+
+    console.log("frameProcessorKeys: ", frameProcessorKeys);
+    
+    try {
+      // Check if the function exists
+      if (typeof (global as any).trueDepthFrameProcessor === 'function') {
+        const result = (global as any).trueDepthFrameProcessor(frame, {
+          mode: 'scan',
+          angle: currentAngle
+        });
+        console.log("RESULT: ", result);
+      } else {
+        console.log("❌ trueDepthFrameProcessor function not found");
+      }
+    } catch (error) {
+      console.log("❌ Error in frame processor:", error);
+    }
+  }, [currentAngle, isPluginLoaded])
 
   const checkPermissions = async () => {
     const persmission = await Camera.requestCameraPermission()

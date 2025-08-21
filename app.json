@@ -23,8 +23,11 @@
       },
       "permissions": [
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "package": "com.humaidjaffery.cpapFrontend"
     },
     "web": {
       "bundler": "metro",
@@ -54,7 +57,8 @@
           "cameraPermissionText": "$(PRODUCT_NAME) needs access to your Camera.",
           "enableFrameProcessors": true
         }
-      ]
+      ],
+      "./plugins/withTrueDepthFrameProcessor.js"
     ],
     "experiments": {
       "typedRoutes": true
