@@ -10,6 +10,6 @@ public class TrueDepthFrameProcessorPlugin: FrameProcessorPlugin {
     let buffer = frame.buffer
     let orientation = frame.orientation
     // code goes here
-    return "Yo humaid this frame processor is working"
+    return "Yo (humaid) this frame processor is working --------------------------"
   }
 }

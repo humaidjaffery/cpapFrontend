@@ -7,14 +7,16 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "$(PRODUCT_NAME) needs access to your Camera.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.humaidjaffery.cpapFrontend"
+      "bundleIdentifier": "com.humaidjaffery.cpapFrontend",
+      "jsEngine": "hermes"
+
     },
     "android": {
       "adaptiveIcon": {
@@ -57,9 +59,8 @@
           "cameraPermissionText": "$(PRODUCT_NAME) needs access to your Camera.",
           "enableFrameProcessors": true
         }
-      ],
-      "./plugins/withTrueDepthFrameProcessor.js"
-    ],
+      ]
+  ],
     "experiments": {
       "typedRoutes": true
     },

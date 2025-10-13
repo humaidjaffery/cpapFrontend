@@ -6,11 +6,7 @@ import {Camera, useCameraPermission, CameraPermissionStatus, useCameraDevice, us
 import { BottomTabBarHeightCallbackContext } from '@react-navigation/bottom-tabs';
 
 
-import type { Frame } from 'react-native-vision-camera'
-
-// declare global {
-//   function trueDepthFrameProcessor(frame: Frame, options?: any): any;
-// }
+import { VisionCameraProxy, Frame } from 'react-native-vision-camera';
 
 const { width, height } = Dimensions.get('window');
 interface ScanData {
@@ -39,6 +35,7 @@ export default function ActiveScan() {
 
   useEffect(() => {
     console.log('�� Checking trueDepthFrameProcessor availability...');
+    
     
     // Check if it's available in the global scope
     if (typeof (global as any).trueDepthFrameProcessor === 'function') {
@@ -75,23 +72,7 @@ export default function ActiveScan() {
     console.log("IN frame processor")
     // Check for any frame processor related functions
     const frameProcessorKeys = Object.keys(global)
-
     console.log("frameProcessorKeys: ", frameProcessorKeys);
-    
-    try {
-      // Check if the function exists
-      if (typeof (global as any).trueDepthFrameProcessor === 'function') {
-        const result = (global as any).trueDepthFrameProcessor(frame, {
-          mode: 'scan',
-          angle: currentAngle
-        });
-        console.log("RESULT: ", result);
-      } else {
-        console.log("❌ trueDepthFrameProcessor function not found");
-      }
-    } catch (error) {
-      console.log("❌ Error in frame processor:", error);
-    }
   }, [currentAngle, isPluginLoaded])
 
   const checkPermissions = async () => {
@@ -130,7 +111,7 @@ export default function ActiveScan() {
 
     setScanProgress(100);
     setIsScanning(false);
-    router.push('/scan/review');
+    router.push('/scan/review');    
   };
 
   const handleCancel = () => {
@@ -172,11 +153,19 @@ export default function ActiveScan() {
 
   const currentAngleData = angles.find(a => a.key === currentAngle);
 
+  const test_log = () => {
+    console.log("Test log function called");
+  }
+
   return (
     <View className='h-full w-full'>
       <Camera style={{flex: 1}} device={device} frameProcessor={frameProcessor} isActive /> 
       <View className='absolute top-0 left-0 right-0 bottom-0 w-full h-full flex justify-center items-center'>
-        <Text className='text-3xl text-center '> Scan </Text>
+        <TouchableOpacity onPress={test_log}>
+          <Text className='text-3xl text-center'> Scann </Text>
+
+          <Text className='text-lg text-center'> New Update text that is not showing up on the development build on my phone </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

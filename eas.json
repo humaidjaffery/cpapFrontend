@@ -9,7 +9,7 @@
       "distribution": "internal",
       "ios": {
         "resourceClass": "m-medium",
-        "buildConfiguration": "Release"
+        "buildConfiguration": "Debug"
       }
     },
     "preview": {
