@@ -23,17 +23,15 @@ target 'Frontend' do
 
   use_react_native!(
     :path => config[:reactNativePath],
-    :hermes_enabled => podfile_properties['expo.jsEngine'].nl? || podfile_properties['expo.jsEngine'] == 'hermes',
+    :hermes_enabled => podfile_properties['expo.jsEngine'].nil? || podfile_properties['expo.jsEngine'] == 'hermes',
     :app_path => "#{Pod::Config.instance.installation_root}/..",
-    :privacy_file_aggregation_enabled => podfile_properties['apple.privacyManifestAggregationEnabled'] != 'false',
   )
 
   post_install do |installer|
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false,
-      :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
+      :mac_catalyst_enabled => false
     )
 
     # Disable code signing for resource bundles
@@ -45,5 +43,15 @@ target 'Frontend' do
           end
         end
       end
+
+    # Fix expo-dev-menu pod target xcconfig merge conflict
+    installer.pods_project.targets.each do |target|
+      if target.name == 'expo-dev-menu'
+        target.build_configurations.each do |config|
+          config.build_settings['DEFINES_MODULE'] = 'YES'
+        end
+      end
+    end
+
   end
 end
