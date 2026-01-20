@@ -32,7 +32,7 @@
           "enableFrameProcessors": true
         }
       ]
-  ],
+    ],
     "experiments": {
       "typedRoutes": true
     },
@@ -42,6 +42,19 @@
         "projectId": "d10f5e69-5ece-4861-b667-fd2bf7807a43"
       }
     },
-    "owner": "humaidjaffery"
+    "owner": "humaidjaffery",
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "$(PRODUCT_NAME) needs access to your Camera."
+      },
+      "bundleIdentifier": "com.humaidjaffery.Frontend"
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.humaidjaffery.Frontend"
+    }
   }
 }

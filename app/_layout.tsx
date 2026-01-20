@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../contexts/AuthContext';
-import "./globals.css"
+import "./globals.css";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

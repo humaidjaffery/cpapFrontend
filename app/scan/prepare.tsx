@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-na
 import { router } from 'expo-router';
 import { Camera } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import "../globals.css";
 
 export default function ScanPrepare() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);

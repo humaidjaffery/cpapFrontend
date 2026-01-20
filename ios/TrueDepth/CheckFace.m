@@ -7,4 +7,4 @@
 #import "Frontend-Swift.h"
 #endif
 
-VISION_EXPORT_SWIFT_FRAME_PROCESSOR(TrueDepthFrameProcessorPlugin, trueDepthFrameProcessor)
+VISION_EXPORT_SWIFT_FRAME_PROCESSOR(CheckFacePlugin, CheckFace)
