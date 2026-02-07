@@ -8,6 +8,37 @@ import { checkFaceFrameProcessor, CheckFaceData } from '../../utils/frameProcess
 import { analyzeDepthQuality, formatDepthReport, validateDepthForFaceMeasurement } from '../../utils/depthDataAnalyzer';
 import "../globals.css";
 
+// Backend URL - change this to your server's IP when running
+// Use your Mac's IP address (not 127.0.0.1 which only works on the same device)
+const BACKEND_URL = 'http://172.20.10.12:8000';
+
+// Simple test function to verify backend connectivity
+const testBackendConnection = async () => {
+  try {
+    console.log('[testBackend] 🧪 Testing backend connection...');
+    console.log(`[testBackend]    URL: ${BACKEND_URL}/health`);
+    
+    const response = await fetch(`${BACKEND_URL}/health`, {
+      method: 'GET',
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[testBackend] ✅ Backend is reachable!', data);
+      Alert.alert('✅ Success', `Backend connected!\n\nResponse: ${JSON.stringify(data)}`);
+      return true;
+    } else {
+      console.log('[testBackend] ❌ Backend returned error:', response.status);
+      Alert.alert('❌ Error', `Backend returned status: ${response.status}`);
+      return false;
+    }
+  } catch (error: any) {
+    console.error('[testBackend] ❌ Connection failed:', error.message);
+    Alert.alert('❌ Connection Failed', `Could not reach backend.\n\nError: ${error.message}\n\nMake sure:\n1. Backend is running\n2. Phone and Mac are on same network\n3. IP address is correct`);
+    return false;
+  }
+};
+
 const { width, height } = Dimensions.get('window');
 
 interface ScanData {
@@ -49,15 +80,15 @@ export default function ActiveScan() {
     
     return () => {
       // Cleanup on unmount
-      DepthPhotoCapture.stopCamera().catch(err => console.log('Error stopping camera:', err));
+      DepthPhotoCapture.stopCamera().catch(err => console.log('[useEffect cleanup] Error stopping camera:', err));
     };
   }, [hasPermission]);
 
   const setupCamera = async () => {
     try {
-      console.log('📷 Setting up TrueDepth camera...');
+      console.log('[setupCamera] 📷 Setting up TrueDepth camera...');
       const result = await DepthPhotoCapture.setupCamera();
-      console.log('📷 Camera setup result:', result);
+      console.log('[setupCamera] 📷 Camera setup result:', result);
       setCameraReady(result.success);
       setDepthAvailable(result.depthAvailable);
       
@@ -69,7 +100,7 @@ export default function ActiveScan() {
         );
       }
     } catch (error: any) {
-      console.error('❌ Camera setup failed:', error);
+      console.error('[setupCamera] ❌ Camera setup failed:', error);
       Alert.alert(
         'Camera Setup Failed',
         error.message || 'Could not initialize TrueDepth camera',
@@ -94,12 +125,12 @@ export default function ActiveScan() {
       const sorted = depthFormats.sort((a, b) => 
         (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight)
       );
-      console.log(`✅ Found ${depthFormats.length} depth-capable formats`);
-      console.log(`Using format: ${sorted[0].videoWidth}x${sorted[0].videoHeight}`);
+      console.log(`[format useMemo] ✅ Found ${depthFormats.length} depth-capable formats`);
+      console.log(`[format useMemo] Using format: ${sorted[0].videoWidth}x${sorted[0].videoHeight}`);
       return sorted[0];
     }
     
-    console.log('⚠️ No depth-capable formats found on this device');
+    console.log('[format useMemo] ⚠️ No depth-capable formats found on this device');
     return undefined;
   }, [device]);
   
@@ -119,9 +150,9 @@ export default function ActiveScan() {
 
   useEffect(() => {
     if (format) {
-      console.log('📹 Selected Format Details:');
-      console.log(`  Resolution: ${format.videoWidth}x${format.videoHeight}`);
-      console.log(`  Supports Depth: ${format.supportsDepthCapture}`);
+      console.log('[format useEffect] 📹 Selected Format Details:');
+      console.log(`[format useEffect]   Resolution: ${format.videoWidth}x${format.videoHeight}`);
+      console.log(`[format useEffect]   Supports Depth: ${format.supportsDepthCapture}`);
     }
   }, [format]);
   
@@ -132,15 +163,53 @@ export default function ActiveScan() {
 
   const captureDepthPhoto = async (): Promise<DepthPhotoCaptureResult | null> => {
     try {
-      console.log('📸 Capturing depth photo...');
+      console.log('[captureDepthPhoto] 📸 Capturing depth photo...');
       const result = await DepthPhotoCapture.captureDepthPhoto();
-      console.log('📸 Capture result:', result);
+      // console.log('[captureDepthPhoto] 📸 Capture result:', result);
       setLastCaptureResult(result);
       return result;
     } catch (error: any) {
-      console.error('❌ Capture failed:', error);
+      console.error('[captureDepthPhoto] ❌ Capture failed:', error);
       Alert.alert('Capture Failed', error.message || 'Could not capture depth photo');
       return null;
+    }
+  };
+
+  const sendDepthToBackend = async (result: DepthPhotoCaptureResult, depthArray: number[]): Promise<boolean> => {
+    try {
+      console.log('[sendDepthToBackend] 📤 Sending depth data to backend...');
+      console.log(`[sendDepthToBackend]    URL: ${BACKEND_URL}/api/depth-capture`);
+      console.log(`[sendDepthToBackend]    Points: ${depthArray.length}`);
+      
+      const payload = {
+        depthArray: depthArray,
+        depthWidth: result.depthWidth,
+        depthHeight: result.depthHeight,
+        depthAccuracy: result.depthAccuracy,
+        minDepth: result.minDepth || 0,
+        maxDepth: result.maxDepth || 0,
+        avgDepth: result.avgDepth || 0,
+        timestamp: result.timestamp || Date.now(),
+      };
+      
+      const response = await fetch(`${BACKEND_URL}/api/depth-capture`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('[sendDepthToBackend] ✅ Backend response:', data);
+      return data.success;
+    } catch (error: any) {
+      console.error('[sendDepthToBackend] ❌ Failed to send to backend:', error.message);
+      return false;
     }
   };
 
@@ -154,7 +223,7 @@ export default function ActiveScan() {
       return;
     }
     
-    console.log('📸 Starting capture - disabling frame processor...');
+    console.log('[handleCapturePhoto] 📸 Starting capture - disabling frame processor...');
     setIsCapturing(true); // Disable frame processor
     setIsScanning(true);
     
@@ -166,56 +235,75 @@ export default function ActiveScan() {
     setIsCapturing(false); // Re-enable frame processor
     setIsScanning(false);
     
-    console.log('📸 CAPTURE RESULT:', JSON.stringify(result, null, 2));
+    // console.log('📸 CAPTURE RESULT:', JSON.stringify(result, null, 2));
+
     
     if (result && result.success) {
       // Analyze depth quality
       const qualityReport = analyzeDepthQuality(result);
       const validation = validateDepthForFaceMeasurement(result);
       
-      console.log('✅ SUCCESS - Depth data captured!');
-      console.log(`📊 Depth Accuracy: ${result.depthAccuracy}`);
-      console.log(`📏 Depth Resolution: ${result.depthWidth}x${result.depthHeight}`);
-      console.log(`📁 File saved at: ${result.filePath}`);
-      console.log(`🔢 Depth Data Type: ${result.depthDataType}`);
-      console.log(`🔍 Filtered: ${result.isDepthDataFiltered}`);
-      console.log('\n' + formatDepthReport(qualityReport));
-      console.log(`\n🎯 Suitable for face measurement: ${validation.suitable ? 'YES' : 'NO'}`);
-      console.log(`   Reason: ${validation.reason}`);
+      console.log('[handleCapturePhoto] ✅ SUCCESS - Depth data captured!');
+      console.log(`[handleCapturePhoto] 📊 Depth Accuracy: ${result.depthAccuracy}`);
+      console.log(`[handleCapturePhoto] 📏 Depth Resolution: ${result.depthWidth}x${result.depthHeight}`);
+      console.log(`[handleCapturePhoto] 📁 File saved at: ${result.filePath}`);
+      console.log(`[handleCapturePhoto] 🔢 Depth Data Type: ${result.depthDataType}`);
+      console.log(`[handleCapturePhoto] 🔍 Filtered: ${result.isDepthDataFiltered}`);
+      console.log('[handleCapturePhoto] \n' + formatDepthReport(qualityReport));
+      console.log(`[handleCapturePhoto] \n🎯 Suitable for face measurement: ${validation.suitable ? 'YES' : 'NO'}`);
+      console.log(`[handleCapturePhoto]    Reason: ${validation.reason}`);
       
       // Display depth data info (now saved as binary file)
       if (result.depthDataPath) {
-        console.log('\n✅ Depth data saved as binary file!');
-        console.log(`📊 Depth Stats:`);
-        console.log(`   Min: ${result.minDepth?.toFixed(3)}m`);
-        console.log(`   Max: ${result.maxDepth?.toFixed(3)}m`);
-        console.log(`   Avg: ${result.avgDepth?.toFixed(3)}m`);
-        console.log(`   Binary file: ${result.depthDataPath}`);
-        console.log(`   Total Points: ${result.depthWidth * result.depthHeight}`);
+        console.log('[handleCapturePhoto] \n✅ Depth data saved as binary file!');
+        console.log(`[handleCapturePhoto] 📊 Depth Stats:`);
+        console.log(`[handleCapturePhoto]    Min: ${result.minDepth?.toFixed(3)}m`);
+        console.log(`[handleCapturePhoto]    Max: ${result.maxDepth?.toFixed(3)}m`);
+        console.log(`[handleCapturePhoto]    Avg: ${result.avgDepth?.toFixed(3)}m`);
+        console.log(`[handleCapturePhoto]    Binary file: ${result.depthDataPath}`);
+        console.log(`[handleCapturePhoto]    Total Points: ${result.depthWidth * result.depthHeight}`);
         
-        // Read first chunk to show sample data
+        // Read all depth data and send to backend
         try {
-          console.log('📖 Reading sample depth data...');
-          const chunk = await DepthPhotoCapture.readDepthBinaryChunk(result.depthDataPath, 0, 20);
-          console.log(`   First 10 values: [${chunk.data.slice(0, 10).map(v => v.toFixed(3)).join(', ')}...]`);
-          console.log(`   Total points in file: ${chunk.totalPoints.toLocaleString()}`);
+          console.log('[handleCapturePhoto] 📖 Reading full depth data for backend...');
+          const totalPoints = result.depthWidth * result.depthHeight;
+          const allDepthData: number[] = [];
+          const chunkSize = 50000; // Read in chunks of 50k points
+          
+          for (let offset = 0; offset < totalPoints; offset += chunkSize) {
+            const count = Math.min(chunkSize, totalPoints - offset);
+            const chunk = await DepthPhotoCapture.readDepthBinaryChunk(result.depthDataPath, offset, count);
+            allDepthData.push(...chunk.data);
+            console.log(`[handleCapturePhoto]    Read chunk: ${offset} - ${offset + count} (${allDepthData.length}/${totalPoints})`);
+          }
+          
+          console.log(`[handleCapturePhoto] ✅ Read all ${allDepthData.length.toLocaleString()} depth points`);
+          console.log(`[handleCapturePhoto]    First 5 values: [${allDepthData.slice(0, 5).map(v => v.toFixed(3)).join(', ')}...]`);
+          
+          // Send to backend
+          const backendSuccess = await sendDepthToBackend(result, allDepthData);
+          if (backendSuccess) {
+            console.log('[handleCapturePhoto] ✅ Depth data sent to backend and saved!');
+          } else {
+            console.log('[handleCapturePhoto] ⚠️ Failed to send to backend (is the server running?)');
+          }
         } catch (error: any) {
-          console.log('⚠️ Could not read sample data:', error.message);
+          console.log('[handleCapturePhoto] ⚠️ Could not read/send depth data:', error.message);
         }
         
         // Store for later use
         setLastCaptureResult(result);
       } else {
-        console.log('⚠️ No depth data path in capture result');
+        console.log('[handleCapturePhoto] ⚠️ No depth data path in capture result');
       }
       
       // Save to Photos app
-      console.log('💾 Saving to Photos app...');
+      console.log('[handleCapturePhoto] 💾 Saving to Photos app...');
       try {
         const saveResult = await DepthPhotoCapture.saveToPhotos(result.filePath);
-        console.log('✅ Saved to Photos:', saveResult);
+        console.log('[handleCapturePhoto] ✅ Saved to Photos:', saveResult);
       } catch (error: any) {
-        console.log('⚠️ Failed to save to Photos:', error.message);
+        console.log('[handleCapturePhoto] ⚠️ Failed to save to Photos:', error.message);
       }
       
       Alert.alert(
@@ -229,7 +317,7 @@ export default function ActiveScan() {
         [{ text: 'OK' }]
       );
     } else {
-      console.log('❌ CAPTURE FAILED:', result);
+      console.log('[handleCapturePhoto] ❌ CAPTURE FAILED:', result);
       Alert.alert('Error', 'Failed to capture depth photo. Please try again.');
     }
   };
@@ -274,14 +362,8 @@ export default function ActiveScan() {
   const currentAngleData = angles.find(a => a.key === currentAngle);
 
   return (
-    <View className='h-full w-full'>
-      <Camera 
-        style={{flex: 1}} 
-        device={device} 
-        format={format}
-        frameProcessor={frameProcessor}
-        isActive 
-      /> 
+    <View className='h-full w-full bg-black'>
+      {/* Remove VisionCamera's Camera component - using native DepthPhotoCapture instead */}
       <View className='absolute top-0 left-0 right-0 bottom-0 w-full h-full flex justify-center items-center'>
         <View className='bg-black/50 p-4 rounded-lg mb-4'>
           <Text className='text-white text-center mb-2'>
@@ -313,6 +395,16 @@ export default function ActiveScan() {
         >
           <Text className='text-white text-xl font-bold text-center'>
             {!cameraReady ? 'Setting Up...' : isScanning ? 'Capturing...' : 'Capture Depth Photo'}
+          </Text>
+        </TouchableOpacity>
+        
+        {/* Test Backend Connection Button */}
+        <TouchableOpacity 
+          onPress={testBackendConnection}
+          className='px-6 py-3 rounded-lg bg-green-600 mt-4'
+        >
+          <Text className='text-white text-sm font-bold text-center'>
+            🧪 Test Backend Connection
           </Text>
         </TouchableOpacity>
       </View>

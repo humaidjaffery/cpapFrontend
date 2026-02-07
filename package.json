@@ -17,9 +17,6 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-firebase/app": "^23.8.3",
-    "@react-native-firebase/firestore": "^23.8.3",
-    "@react-native-firebase/storage": "^23.8.3",
     "@testing-library/react-native": "^12.3.0",
     "expo": "^54.0.23",
     "expo-auth-session": "^7.0.8",
@@ -32,7 +29,6 @@
     "expo-splash-screen": "~31.0.10",
     "expo-status-bar": "~3.0.8",
     "expo-web-browser": "^15.0.9",
-    "firebase": "^12.8.0",
     "nativewind": "^4.2.1",
     "prettier-plugin-tailwindcss": "^0.5.14",
     "react": "19.1.0",
