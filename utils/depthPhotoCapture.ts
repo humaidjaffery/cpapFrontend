@@ -31,6 +31,14 @@ export interface DepthPhotoCaptureResult {
   minDepth?: number;
   maxDepth?: number;
   avgDepth?: number;
+  // Camera intrinsics for 3D reconstruction
+  hasIntrinsics?: boolean;
+  fx?: number;  // Focal length X
+  fy?: number;  // Focal length Y
+  cx?: number;  // Principal point X
+  cy?: number;  // Principal point Y
+  intrinsicWidth?: number;   // Reference dimensions width
+  intrinsicHeight?: number;  // Reference dimensions height
 }
 
 export interface CameraSetupResult {

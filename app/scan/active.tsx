@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Alert, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Dimensions, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {Camera, useCameraPermission, CameraPermissionStatus, useCameraDevice, useFrameProcessor} from 'react-native-vision-camera'
 import DepthPhotoCapture, { DepthPhotoCaptureResult } from '../../utils/depthPhotoCapture';
-import { checkFaceFrameProcessor, CheckFaceData } from '../../utils/frameProcessor';
+import FaceReconstruction, { ReconstructionFrame } from '../../utils/faceReconstruction';
+import { checkFaceFrameProcessor, CheckFaceData } from '../../utils/checkFaceFrameProcessor';
 import { analyzeDepthQuality, formatDepthReport, validateDepthForFaceMeasurement } from '../../utils/depthDataAnalyzer';
 import "../globals.css";
 
 // Backend URL - change this to your server's IP when running
 // Use your Mac's IP address (not 127.0.0.1 which only works on the same device)
-const BACKEND_URL = 'http://172.20.10.12:8000';
+// const BACKEND_URL = 'http://172.20.10.12:8000';
+// const BACKEND_URL = 'http://192.168.1.53:8000';
+const BACKEND_URL = 'http://192.168.1.176:8000'
 
 // Simple test function to verify backend connectivity
 const testBackendConnection = async () => {
@@ -60,6 +63,15 @@ export default function ActiveScan() {
   const [lastCaptureResult, setLastCaptureResult] = useState<DepthPhotoCaptureResult | null>(null);
   const [frameProcessorActive, setFrameProcessorActive] = useState(true); // Controls frame processor
   const [isCapturing, setIsCapturing] = useState(false); // New: tracks photo capture state
+  
+  // Reconstruction pipeline state
+  const [capturedFrames, setCapturedFrames] = useState<DepthPhotoCaptureResult[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [reconstructionResult, setReconstructionResult] = useState<{
+    meshFilePath: string;
+    vertexCount: number;
+    faceCount: number;
+  } | null>(null);
 
   const angles = [
     { key: 'front', name: 'Front', icon: 'person', instruction: 'Face the camera directly' },
@@ -213,6 +225,174 @@ export default function ActiveScan() {
     }
   };
 
+  // ============================================
+  // RECONSTRUCTION PIPELINE FUNCTIONS
+  // ============================================
+
+  // Capture and store frame for reconstruction
+  const handleCaptureFrame = async () => {
+    if (!cameraReady || !depthAvailable) {
+      Alert.alert('Camera Not Ready', 'Please wait for the camera to be ready.');
+      return;
+    }
+
+    setIsCapturing(true);
+    
+    try {
+      console.log(`📸 [handleCaptureFrame] Capturing frame ${capturedFrames.length + 1}...`);
+      const result = await DepthPhotoCapture.captureDepthPhoto();
+      
+      if (result.success) {
+        // Store the capture result
+        setCapturedFrames(prev => [...prev, result]);
+        setLastCaptureResult(result);
+        
+        console.log(`✅ [handleCaptureFrame] Frame ${capturedFrames.length + 1} captured`);
+        console.log(`   Depth: ${result.depthWidth}x${result.depthHeight}`);
+        console.log(`   Range: ${result.minDepth?.toFixed(3)}m - ${result.maxDepth?.toFixed(3)}m`);
+        
+        if (result.hasIntrinsics) {
+          console.log(`   Intrinsics: fx=${result.fx?.toFixed(1)}, fy=${result.fy?.toFixed(1)}`);
+          console.log(`               cx=${result.cx?.toFixed(1)}, cy=${result.cy?.toFixed(1)}`);
+        } else {
+          console.log('   ⚠️ No camera intrinsics available');
+        }
+      } else {
+        Alert.alert('Capture Failed', 'Could not capture depth photo. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('❌ [handleCaptureFrame] Capture failed:', error);
+      Alert.alert('Capture Failed', error.message || 'Unknown error');
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  // Final compute - run reconstruction on all captured frames
+  const handleFinalCompute = async () => {
+    if (capturedFrames.length < 2) {
+      Alert.alert(
+        'Not Enough Frames', 
+        `Need at least 2 frames for reconstruction. You have ${capturedFrames.length}.`
+      );
+      return;
+    }
+    
+    setIsProcessing(true);
+    console.log(`🔷 [handleFinalCompute] Starting reconstruction with ${capturedFrames.length} frames...`);
+    
+    try {
+      // Convert capture results to reconstruction frames
+      const frames: ReconstructionFrame[] = capturedFrames.map((capture, index) => 
+        FaceReconstruction.createFrameFromCapture(capture, `frame_${index}`)
+      );
+      
+      console.log('🔷 [handleFinalCompute] Frames prepared:');
+      frames.forEach((frame, i) => {
+        console.log(`   Frame ${i}: ${frame.depthWidth}x${frame.depthHeight}, fx=${frame.fx?.toFixed(1)}`);
+      });
+      
+      // Run reconstruction
+      const result = await FaceReconstruction.reconstructFace(frames);
+      
+      if (result.success) {
+        console.log('✅ [handleFinalCompute] Reconstruction complete!');
+        console.log(`   Mesh file: ${result.meshFilePath}`);
+        console.log(`   Vertices: ${result.vertexCount}`);
+        console.log(`   Faces: ${result.faceCount}`);
+        
+        setReconstructionResult({
+          meshFilePath: result.meshFilePath || '',
+          vertexCount: result.vertexCount || 0,
+          faceCount: result.faceCount || 0,
+        });
+        
+        Alert.alert(
+          '🎉 Reconstruction Complete!', 
+          `3D mesh created successfully!\n\n` +
+          `Vertices: ${result.vertexCount?.toLocaleString()}\n` +
+          `Faces: ${result.faceCount?.toLocaleString()}\n\n` +
+          `File: ${result.meshFilePath}`,
+          [
+            { text: 'OK' },
+            { 
+              text: 'Send to Backend', 
+              onPress: () => uploadMeshToBackend(result.meshFilePath || '') 
+            }
+          ]
+        );
+        
+      } else {
+        console.error('❌ [handleFinalCompute] Reconstruction failed:', result.errorMessage);
+        Alert.alert('Reconstruction Failed', result.errorMessage || 'Unknown error occurred');
+      }
+    } catch (error: any) {
+      console.error('❌ [handleFinalCompute] Error:', error);
+      Alert.alert('Error', `Reconstruction failed: ${error.message || error}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Upload mesh file to backend
+  const uploadMeshToBackend = async (meshFilePath: string) => {
+    try {
+      console.log('📤 [uploadMeshToBackend] Uploading mesh to backend...');
+      console.log(`   File: ${meshFilePath}`);
+      
+      // Read the PLY file and send as form data
+      const formData = new FormData();
+      formData.append('mesh', {
+        uri: `file://${meshFilePath}`,
+        type: 'application/octet-stream',
+        name: 'face_mesh.ply',
+      } as any);
+      
+      const response = await fetch(`${BACKEND_URL}/api/upload-mesh`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ [uploadMeshToBackend] Upload successful:', data);
+        Alert.alert('Upload Complete', 'Mesh file sent to backend successfully!');
+      } else {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ [uploadMeshToBackend] Upload failed:', error);
+      Alert.alert('Upload Failed', error.message || 'Could not upload mesh to backend');
+    }
+  };
+
+  // Clear all captured frames
+  const handleClearFrames = () => {
+    Alert.alert(
+      'Clear All Frames?',
+      `This will delete all ${capturedFrames.length} captured frames.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Clear', 
+          style: 'destructive',
+          onPress: () => {
+            setCapturedFrames([]);
+            setReconstructionResult(null);
+            console.log('🗑️ [handleClearFrames] Cleared all captured frames');
+          }
+        }
+      ]
+    );
+  };
+
+  // ============================================
+  // END RECONSTRUCTION PIPELINE
+  // ============================================
+
   const handleCapturePhoto = async () => {
     if (!cameraReady || !depthAvailable) {
       Alert.alert(
@@ -363,51 +543,180 @@ export default function ActiveScan() {
 
   return (
     <View className='h-full w-full bg-black'>
-      {/* Remove VisionCamera's Camera component - using native DepthPhotoCapture instead */}
-      <View className='absolute top-0 left-0 right-0 bottom-0 w-full h-full flex justify-center items-center'>
-        <View className='bg-black/50 p-4 rounded-lg mb-4'>
-          <Text className='text-white text-center mb-2'>
+      <ScrollView 
+        className='flex-1'
+        contentContainerStyle={{ 
+          flexGrow: 1, 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          paddingVertical: 40 
+        }}
+      >
+        {/* Status Info */}
+        <View className='bg-black/50 p-4 rounded-lg mb-4 w-11/12'>
+          <Text className='text-white text-center mb-2 text-lg font-bold'>
             {cameraReady ? '✅ Camera Ready' : '⏳ Setting up camera...'}
           </Text>
           <Text className='text-white text-center text-sm'>
-            Depth Available: {depthAvailable ? 'Yes' : 'No'}
+            Depth Available: {depthAvailable ? '✓ Yes' : '✗ No'}
           </Text>
           {lastCaptureResult && (
             <>
-              <Text className='text-white text-center text-sm'>
-                Last Capture: {lastCaptureResult.depthAccuracy} accuracy
+              <Text className='text-white text-center text-sm mt-1'>
+                Last: {lastCaptureResult.depthWidth}x{lastCaptureResult.depthHeight} • {lastCaptureResult.depthAccuracy}
               </Text>
-              <Text className='text-white text-center text-sm'>
-                Depth Size: {lastCaptureResult.depthWidth}x{lastCaptureResult.depthHeight}
-              </Text>
+              {lastCaptureResult.hasIntrinsics && (
+                <Text className='text-green-400 text-center text-xs mt-1'>
+                  ✓ Intrinsics: fx={lastCaptureResult.fx?.toFixed(0)} fy={lastCaptureResult.fy?.toFixed(0)}
+                </Text>
+              )}
             </>
           )}
         </View>
+
+        {/* ============================================ */}
+        {/* RECONSTRUCTION PIPELINE UI */}
+        {/* ============================================ */}
         
+        {/* Captured Frames Counter */}
+        <View className='bg-blue-900/70 p-4 rounded-lg mb-4 w-11/12'>
+          <Text className='text-white text-center text-lg font-bold mb-2'>
+            🎬 Captured Frames: {capturedFrames.length}
+          </Text>
+          
+          {capturedFrames.length > 0 && (
+            <View className='flex-row flex-wrap justify-center gap-1'>
+              {capturedFrames.map((frame, index) => (
+                <View key={index} className='bg-blue-500 px-2 py-1 rounded'>
+                  <Text className='text-white text-xs'>
+                    #{index + 1}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+          
+          {capturedFrames.length === 0 && (
+            <Text className='text-blue-200 text-center text-sm'>
+              Capture at least 2 frames to reconstruct
+            </Text>
+          )}
+        </View>
+
+        {/* Main Capture Button */}
         <TouchableOpacity 
-          onPress={handleCapturePhoto}
-          disabled={!cameraReady || !depthAvailable || isScanning}
-          className={`px-8 py-4 rounded-lg ${
-            !cameraReady || !depthAvailable || isScanning
-              ? 'bg-gray-500' 
+          onPress={handleCaptureFrame}
+          disabled={!cameraReady || !depthAvailable || isCapturing || isProcessing}
+          className={`px-8 py-5 rounded-xl mb-3 w-11/12 ${
+            !cameraReady || !depthAvailable || isCapturing || isProcessing
+              ? 'bg-gray-600' 
               : 'bg-blue-500'
           }`}
         >
           <Text className='text-white text-xl font-bold text-center'>
-            {!cameraReady ? 'Setting Up...' : isScanning ? 'Capturing...' : 'Capture Depth Photo'}
+            {!cameraReady 
+              ? '⏳ Setting Up...' 
+              : isCapturing 
+                ? '📸 Capturing...' 
+                : `📸 Capture Frame (${capturedFrames.length})`
+            }
+          </Text>
+          <Text className='text-blue-100 text-center text-sm mt-1'>
+            Move slightly between captures for best results
+          </Text>
+        </TouchableOpacity>
+
+        {/* Final Compute Button */}
+        <TouchableOpacity 
+          onPress={handleFinalCompute}
+          disabled={isProcessing || capturedFrames.length < 2}
+          className={`px-8 py-5 rounded-xl mb-3 w-11/12 ${
+            isProcessing || capturedFrames.length < 2
+              ? 'bg-gray-600' 
+              : 'bg-green-600'
+          }`}
+        >
+          <Text className='text-white text-xl font-bold text-center'>
+            {isProcessing 
+              ? '⏳ Processing...' 
+              : `🧮 Final Compute (${capturedFrames.length} frames)`
+            }
+          </Text>
+          {capturedFrames.length < 2 && (
+            <Text className='text-green-200 text-center text-sm mt-1'>
+              Need at least 2 frames
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Clear Button */}
+        {capturedFrames.length > 0 && (
+          <TouchableOpacity 
+            onPress={handleClearFrames}
+            disabled={isProcessing}
+            className='px-6 py-3 rounded-lg bg-red-600/80 mb-4 w-11/12'
+          >
+            <Text className='text-white text-center font-bold'>
+              🗑️ Clear All Frames
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Reconstruction Result */}
+        {reconstructionResult && (
+          <View className='bg-green-900/70 p-4 rounded-lg mb-4 w-11/12'>
+            <Text className='text-green-300 text-center text-lg font-bold mb-2'>
+              ✅ Reconstruction Complete!
+            </Text>
+            <Text className='text-white text-center text-sm'>
+              Vertices: {reconstructionResult.vertexCount.toLocaleString()}
+            </Text>
+            <Text className='text-white text-center text-sm'>
+              Faces: {reconstructionResult.faceCount.toLocaleString()}
+            </Text>
+            <TouchableOpacity 
+              onPress={() => uploadMeshToBackend(reconstructionResult.meshFilePath)}
+              className='mt-3 px-4 py-2 bg-green-600 rounded-lg'
+            >
+              <Text className='text-white text-center font-bold'>
+                📤 Send to Backend
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ============================================ */}
+        {/* END RECONSTRUCTION UI */}
+        {/* ============================================ */}
+
+        {/* Divider */}
+        <View className='w-11/12 h-px bg-gray-600 my-4' />
+
+        {/* Legacy Single Capture Button (for testing) */}
+        <TouchableOpacity 
+          onPress={handleCapturePhoto}
+          disabled={!cameraReady || !depthAvailable || isScanning}
+          className={`px-6 py-3 rounded-lg mb-3 w-11/12 ${
+            !cameraReady || !depthAvailable || isScanning
+              ? 'bg-gray-700' 
+              : 'bg-purple-600'
+          }`}
+        >
+          <Text className='text-white text-sm font-bold text-center'>
+            📷 Single Capture (legacy - sends to backend)
           </Text>
         </TouchableOpacity>
         
         {/* Test Backend Connection Button */}
         <TouchableOpacity 
           onPress={testBackendConnection}
-          className='px-6 py-3 rounded-lg bg-green-600 mt-4'
+          className='px-6 py-3 rounded-lg bg-gray-700 w-11/12'
         >
           <Text className='text-white text-sm font-bold text-center'>
             🧪 Test Backend Connection
           </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 } 

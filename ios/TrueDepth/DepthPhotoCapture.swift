@@ -502,6 +502,36 @@ private class DepthPhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate
       print("📸 [Delegate] Depth data type: \(depthDataType)")
       print("📸 [Delegate] Depth data filtered: \(depthData.isDepthDataFiltered)")
       
+      // Extract camera intrinsics for 3D reconstruction
+      var intrinsicsDict: [String: Any] = ["hasIntrinsics": false]
+      if let calibrationData = depthData.cameraCalibrationData {
+        let intrinsicMatrix = calibrationData.intrinsicMatrix
+        let intrinsicReferenceDimensions = calibrationData.intrinsicMatrixReferenceDimensions
+        
+        // Extract focal lengths and principal point from 3x3 intrinsic matrix
+        // Matrix format: [fx, 0, 0], [0, fy, 0], [cx, cy, 1]
+        let fx = intrinsicMatrix.columns.0.x  // focal length x
+        let fy = intrinsicMatrix.columns.1.y  // focal length y
+        let cx = intrinsicMatrix.columns.2.x  // principal point x
+        let cy = intrinsicMatrix.columns.2.y  // principal point y
+        
+        print("📐 [Delegate] Camera intrinsics extracted:")
+        print("   fx=\(fx), fy=\(fy), cx=\(cx), cy=\(cy)")
+        print("   Reference dimensions: \(intrinsicReferenceDimensions.width)x\(intrinsicReferenceDimensions.height)")
+        
+        intrinsicsDict = [
+          "hasIntrinsics": true,
+          "fx": fx,
+          "fy": fy,
+          "cx": cx,
+          "cy": cy,
+          "intrinsicWidth": intrinsicReferenceDimensions.width,
+          "intrinsicHeight": intrinsicReferenceDimensions.height
+        ]
+      } else {
+        print("⚠️ [Delegate] No camera calibration data available")
+      }
+      
       // Extract raw depth array
       print("🔍 [Delegate] Extracting raw depth array...")
       if let depthExtraction = DepthPhotoCapture.extractDepthArray(from: depthData) {
@@ -519,7 +549,8 @@ private class DepthPhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate
           try data.write(to: depthFileURL)
           print("💾 [Delegate] Depth array saved as binary file: \(depthFileURL.path)")
           
-          resolve([
+          // Build result with intrinsics
+          var result: [String: Any] = [
             "success": true,
             "filePath": fileURL.path,
             "depthWidth": depthWidth,
@@ -533,11 +564,17 @@ private class DepthPhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate
             "minDepth": depthExtraction.min,
             "maxDepth": depthExtraction.max,
             "avgDepth": depthExtraction.avg
-          ])
+          ]
+          // Merge intrinsics into result
+          for (key, value) in intrinsicsDict {
+            result[key] = value
+          }
+          
+          resolve(result)
         } catch {
           print("⚠️ [Delegate] Could not save binary file: \(error.localizedDescription)")
-          // Fall back to result without depth data
-          resolve([
+          // Fall back to result without binary depth file but with intrinsics
+          var result: [String: Any] = [
             "success": true,
             "filePath": fileURL.path,
             "depthWidth": depthWidth,
@@ -549,11 +586,16 @@ private class DepthPhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate
             "minDepth": depthExtraction.min,
             "maxDepth": depthExtraction.max,
             "avgDepth": depthExtraction.avg
-          ])
+          ]
+          // Merge intrinsics into result
+          for (key, value) in intrinsicsDict {
+            result[key] = value
+          }
+          resolve(result)
         }
       } else {
         print("⚠️ [Delegate] Could not extract depth array, returning without it")
-        resolve([
+        var result: [String: Any] = [
           "success": true,
           "filePath": fileURL.path,
           "depthWidth": depthWidth,
@@ -562,7 +604,12 @@ private class DepthPhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate
           "depthDataType": depthDataType,
           "isDepthDataFiltered": depthData.isDepthDataFiltered,
           "timestamp": Date().timeIntervalSince1970
-        ])
+        ]
+        // Merge intrinsics into result
+        for (key, value) in intrinsicsDict {
+          result[key] = value
+        }
+        resolve(result)
       }
       
     } catch {
